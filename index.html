@@ -417,6 +417,9 @@
     <div class="brain-header">
       <input id="brain-search" type="text" placeholder="Übungen suchen..." oninput="renderBrainTable()">
       <button class="btn btn-primary" onclick="openExerciseModal()">+ Neue Übung</button>
+      <button class="btn btn-outline" onclick="backupBrain()" title="Datenbank als JSON-Datei herunterladen">&#8595; Backup</button>
+      <button class="btn btn-outline" onclick="document.getElementById('import-input').click()" title="Backup-Datei importieren">&#8593; Importieren</button>
+      <input id="import-input" type="file" accept=".json" style="display:none" onchange="importBrain(event)">
     </div>
     <div class="table-wrap">
       <table>
@@ -771,6 +774,62 @@ function deleteExercise(id) {
   saveBrain(loadBrain().filter(e => e.id !== id));
   renderBrainTable();
   showToast('Übung gelöscht.');
+}
+
+// ─────────────── Backup / Import ───────────────
+function backupBrain() {
+  const brain = loadBrain();
+  if (brain.length === 0) { showToast('Datenbank ist leer – nichts zu sichern.', 'err'); return; }
+  const json = JSON.stringify(brain, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `physio_datenbank_${new Date().toLocaleDateString('de-DE').replace(/\./g, '-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Backup mit ${brain.length} Übungen heruntergeladen.`);
+}
+
+function importBrain(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Kein gültiges Array.');
+      const valid = data.filter(ex => ex.name && ex.cat && ex.desc);
+      if (valid.length === 0) throw new Error('Keine gültigen Einträge gefunden.');
+
+      const existing = loadBrain();
+      const existingIds = new Set(existing.map(ex => ex.id));
+
+      // Assign new IDs to entries without one or with duplicates
+      const toAdd = valid.map(ex => ({
+        id:   (!ex.id || existingIds.has(ex.id)) ? crypto.randomUUID() : ex.id,
+        name: ex.name,
+        cat:  ex.cat,
+        desc: ex.desc
+      }));
+
+      const confirmed = existing.length === 0 || confirm(
+        `Es sind bereits ${existing.length} Übungen gespeichert.\n\n` +
+        `Möchtest du die ${toAdd.length} importierten Übungen HINZUFÜGEN (OK)\n` +
+        `oder die bestehende Datenbank ERSETZEN (Abbrechen)?`
+      );
+
+      const merged = confirmed ? [...existing, ...toAdd] : toAdd;
+      saveBrain(merged);
+      renderBrainTable();
+      showToast(`${toAdd.length} Übungen importiert.`);
+    } catch (err) {
+      showToast('Import fehlgeschlagen: ' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ─────────────── Modals ───────────────
