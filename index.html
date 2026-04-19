@@ -467,6 +467,20 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════ IMPORT MODAL ═══════════════════════════ -->
+<div id="import-modal" class="modal">
+  <div class="modal-content">
+    <h2>Backup importieren</h2>
+    <p>Es sind bereits <strong id="import-existing-count">0</strong> Übungen gespeichert.</p>
+    <p style="margin-top:0.5rem">Du importierst <strong id="import-new-count">0</strong> Übungen. Was soll passieren?</p>
+    <div class="modal-footer" style="justify-content:stretch; flex-direction:column; gap:0.5rem; margin-top:1.2rem">
+      <button class="btn btn-primary" style="width:100%" onclick="doImport('add')">Hinzufügen – zu vorhandenen Übungen dazufügen</button>
+      <button class="btn btn-danger"  style="width:100%" onclick="doImport('replace')">Ersetzen – bestehende Daten überschreiben</button>
+      <button class="btn btn-outline" style="width:100%" onclick="closeModal('import-modal')">Abbrechen – Import abbrechen</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════ EXERCISE MODAL ══════════════════════════ -->
 <div id="exercise-modal" class="modal">
   <div class="modal-content">
@@ -796,6 +810,19 @@ function deleteExercise(id) {
 }
 
 // ─────────────── Backup / Import ───────────────
+let pendingImport = null;
+
+function doImport(mode) {
+  if (!pendingImport) return;
+  const { toAdd, existing } = pendingImport;
+  pendingImport = null;
+  closeModal('import-modal');
+  const merged = mode === 'add' ? [...existing, ...toAdd] : toAdd;
+  saveBrain(merged);
+  renderBrainTable();
+  showToast(`${toAdd.length} Übungen ${mode === 'add' ? 'hinzugefügt' : 'importiert (Datenbank ersetzt)'}.`);
+}
+
 function backupBrain() {
   const brain = loadBrain();
   if (brain.length === 0) { showToast('Datenbank ist leer – nichts zu sichern.', 'err'); return; }
@@ -834,16 +861,16 @@ function importBrain(event) {
         desc: ex.desc
       }));
 
-      const confirmed = existing.length === 0 || confirm(
-        `Es sind bereits ${existing.length} Übungen gespeichert.\n\n` +
-        `Möchtest du die ${toAdd.length} importierten Übungen HINZUFÜGEN (OK)\n` +
-        `oder die bestehende Datenbank ERSETZEN (Abbrechen)?`
-      );
-
-      const merged = confirmed ? [...existing, ...toAdd] : toAdd;
-      saveBrain(merged);
-      renderBrainTable();
-      showToast(`${toAdd.length} Übungen importiert.`);
+      if (existing.length === 0) {
+        saveBrain(toAdd);
+        renderBrainTable();
+        showToast(`${toAdd.length} Übungen importiert.`);
+      } else {
+        pendingImport = { toAdd, existing };
+        document.getElementById('import-existing-count').textContent = existing.length;
+        document.getElementById('import-new-count').textContent = toAdd.length;
+        openModal('import-modal');
+      }
     } catch (err) {
       showToast('Import fehlgeschlagen: ' + err.message, 'err');
     }
