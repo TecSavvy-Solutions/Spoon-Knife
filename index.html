@@ -367,6 +367,7 @@
   <div>
     <h1>PhysioPlaner</h1>
     <p>Hausaufgaben-Generator für die Physiotherapie</p>
+    <p id="header-therapist" style="display:none; font-size:0.82rem; opacity:0.95; margin-top:2px; font-weight:600"></p>
   </div>
   <button id="settingsBtn" title="Einstellungen">⚙</button>
 </header>
@@ -479,12 +480,46 @@
 <div id="settings-modal" class="modal">
   <div class="modal-content">
     <h2>⚙ Einstellungen</h2>
+    <label for="therapist-name-input">Name Therapeutin / Therapeut</label>
+    <input id="therapist-name-input" type="text" placeholder="z.B. Sarah Müller, PT">
+    <p class="hint" style="margin-bottom:1rem">Wird im Header und im Word-Export angezeigt.</p>
     <label for="api-key-input">Gemini API Key</label>
     <input id="api-key-input" type="password" placeholder="AIzaSy...">
     <p class="hint">Der Key wird ausschließlich lokal in diesem Browser gespeichert und nirgends übertragen.</p>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('settings-modal')">Abbrechen</button>
-      <button class="btn btn-primary" onclick="saveApiKey()">Speichern</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ DISCLAIMER MODAL ════════════════════════ -->
+<div id="disclaimer-modal" class="modal">
+  <div class="modal-content">
+    <h2>⚕ Wichtiger Hinweis</h2>
+    <p style="margin-bottom:0.8rem; line-height:1.7">
+      PhysioPlaner ist ein Hilfsmittel zur Erstellung von Hausaufgabenplänen
+      und <strong>ersetzt keine ärztliche Diagnose oder individuelle Therapiebeurteilung</strong>.
+    </p>
+    <p style="margin-bottom:0.8rem; line-height:1.7">
+      Alle durch die KI generierten Inhalte sind vom behandelnden Therapeuten
+      <strong>vor der Weitergabe an Patienten zu prüfen und ggf. anzupassen</strong>.
+      Die fachliche Verantwortung liegt ausschließlich beim Therapeuten.
+    </p>
+    <p style="line-height:1.7">
+      Die KI kann Fehler machen. Übungsbeschreibungen, Dosierungen und
+      Hinweise sind stets auf den individuellen Patienten abzustimmen.
+    </p>
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-top:1.2rem; padding:0.9rem; background:var(--bg); border-radius:6px; border:1.5px solid var(--border)">
+      <input type="checkbox" id="disclaimer-check" onchange="document.getElementById('disclaimer-confirm-btn').disabled = !this.checked" style="width:18px; height:18px; cursor:pointer; flex-shrink:0">
+      <label for="disclaimer-check" style="margin:0; font-size:0.88rem; font-weight:500; cursor:pointer">
+        Ich habe den Hinweis gelesen, verstanden und übernehme die fachliche Verantwortung.
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button id="disclaimer-confirm-btn" class="btn btn-primary" style="width:100%" disabled onclick="acceptDisclaimer()">
+        Bestätigen &amp; App starten
+      </button>
     </div>
   </div>
 </div>
@@ -542,13 +577,28 @@ function saveBrain(brain) {
   localStorage.setItem('physio_brain', JSON.stringify(brain));
 }
 
-// ─────────────── API Key ───────────────
-function saveApiKey() {
-  const key = document.getElementById('api-key-input').value.trim();
+// ─────────────── Settings ───────────────
+function saveSettings() {
+  const key  = document.getElementById('api-key-input').value.trim();
+  const name = document.getElementById('therapist-name-input').value.trim();
   if (!key) { showToast('Bitte einen API Key eingeben.', 'err'); return; }
   localStorage.setItem('physio_api_key', key);
+  localStorage.setItem('physio_therapist_name', name);
+  updateHeaderTherapist(name);
   closeModal('settings-modal');
-  showToast('API Key gespeichert.');
+  showToast('Einstellungen gespeichert.');
+}
+
+function updateHeaderTherapist(name) {
+  const el = document.getElementById('header-therapist');
+  if (name) { el.textContent = name; el.style.display = 'block'; }
+  else       { el.style.display = 'none'; }
+}
+
+// ─────────────── Disclaimer ───────────────
+function acceptDisclaimer() {
+  localStorage.setItem('physio_disclaimer_v1', '1');
+  closeModal('disclaimer-modal');
 }
 
 // ─────────────── Tabs ───────────────
@@ -622,6 +672,7 @@ STRENGE FORMATIERUNGS-REGELN – halte dich exakt daran:
 - Nutze die angegebene Standard-Dosierung; passe sie nur an wenn medizinisch sinnvoll (z.B. Warm-up kürzer)
 - Nutze die Beschreibungen aus der Datenbank, passe sie ggf. auf den Patienten an
 - Übungen ohne Datenbankeinträge mit * markieren
+- Füge am Ende einen Abschnitt ## ALLGEMEINE TIPPS mit 4–5 kurzen, praktischen Hinweisen für den Patienten hinzu (z.B. regelmäßig üben, bei Schmerzen stoppen, Therapeuten kontaktieren)
 - Schreibe professionell, klar und patientenfreundlich auf Deutsch`;
 
   try {
@@ -693,8 +744,9 @@ async function exportWord() {
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
 
-  const patInfo = document.getElementById('pat_info').value.trim();
-  const today   = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const patInfo      = document.getElementById('pat_info').value.trim();
+  const therapist    = localStorage.getItem('physio_therapist_name') || '';
+  const today        = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const children = [
     new Paragraph({
@@ -706,6 +758,10 @@ async function exportWord() {
       children: [new TextRun({ text: `Patient: ${patInfo}`, size: 22 })],
       spacing: { after: 40 }
     }),
+    ...(therapist ? [new Paragraph({
+      children: [new TextRun({ text: `Therapeutin / Therapeut: ${therapist}`, size: 22 })],
+      spacing: { after: 40 }
+    })] : []),
     new Paragraph({
       children: [new TextRun({ text: `Erstellt am: ${today}`, size: 22, color: '718096' })],
       spacing: { after: 300 }
@@ -938,8 +994,13 @@ function esc(str) {
 
 // ─────────────── Init ───────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const storedKey = localStorage.getItem('physio_api_key');
-  if (storedKey) document.getElementById('api-key-input').value = storedKey;
+  const storedKey  = localStorage.getItem('physio_api_key');
+  const storedName = localStorage.getItem('physio_therapist_name') || '';
+  if (storedKey)  document.getElementById('api-key-input').value        = storedKey;
+  if (storedName) document.getElementById('therapist-name-input').value = storedName;
+  updateHeaderTherapist(storedName);
+
+  if (!localStorage.getItem('physio_disclaimer_v1')) openModal('disclaimer-modal');
 
   document.getElementById('settingsBtn').addEventListener('click', () => openModal('settings-modal'));
 
