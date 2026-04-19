@@ -135,6 +135,9 @@
       background: var(--white);
     }
     .form-group textarea { min-height: 76px; resize: vertical; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .form-row input[type="number"] { -moz-appearance: textfield; }
+    .form-row input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 
     /* ── Buttons ── */
     .btn {
@@ -397,6 +400,17 @@
         <input id="exercise_input" type="text" placeholder="z.B. Brücke, Plank, Schulterkreisen, Kniebeuge">
       </div>
 
+      <div class="form-row">
+        <div class="form-group">
+          <label for="sets_input">Sätze</label>
+          <input id="sets_input" type="number" min="1" max="10" value="3" placeholder="z.B. 3">
+        </div>
+        <div class="form-group">
+          <label for="reps_input">Wiederholungen</label>
+          <input id="reps_input" type="text" placeholder="z.B. 15 oder 30 Sek." value="15">
+        </div>
+      </div>
+
       <button id="generateBtn" class="btn btn-primary" onclick="generatePlan()">
         Plan generieren
       </button>
@@ -526,6 +540,8 @@ async function generatePlan() {
   const patInfo   = sanitize(document.getElementById('pat_info').value);
   const goalInfo  = sanitize(document.getElementById('goal_info').value);
   const exercises = sanitize(document.getElementById('exercise_input').value);
+  const sets      = sanitize(document.getElementById('sets_input').value) || '3';
+  const reps      = sanitize(document.getElementById('reps_input').value) || '15';
 
   if (!patInfo || !goalInfo || !exercises) {
     showToast('Bitte alle drei Felder ausfüllen.', 'err');
@@ -557,11 +573,13 @@ Erstelle einen Hausaufgabenplan für:
 Patient: ${patInfo}
 Diagnose / Ziel: ${goalInfo}
 Gewünschte Übungen: ${exercises}
+Standard-Dosierung: ${sets} Sätze × ${reps} Wiederholungen (sofern nicht anders sinnvoll)
 
 STRENGE FORMATIERUNGS-REGELN – halte dich exakt daran:
 - Sortiere alle Übungen in genau drei Abschnitte: Warm-up, Lockerung, Kräftigung
 - Beginne jeden Abschnitt mit der Zeile: ## WARM-UP  oder  ## LOCKERUNG  oder  ## KRÄFTIGUNG
-- Pro Übung: Zeile 1 = **Übungsname**, dann Beschreibung, dann Wiederholungen/Dauer
+- Pro Übung: Zeile 1 = **Übungsname**, dann Beschreibung, dann Dosierung (Sätze × Wiederholungen/Dauer)
+- Nutze die angegebene Standard-Dosierung; passe sie nur an wenn medizinisch sinnvoll (z.B. Warm-up kürzer)
 - Nutze die Beschreibungen aus der Datenbank, passe sie ggf. auf den Patienten an
 - Übungen ohne Datenbankeinträge mit * markieren
 - Schreibe professionell, klar und patientenfreundlich auf Deutsch`;
