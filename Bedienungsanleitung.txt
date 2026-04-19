@@ -70,10 +70,42 @@ Schritt 5: Plan als Word-Datei herunterladen
 
   Die Datei wird automatisch heruntergeladen und enthält:
   - Patientenname und Datum im Dateinamen
-  - Alle Übungen gegliedert in Warm-up, Lockerung und Kräftigung
+    (Beispiel: Hausaufgaben_Maria_M._19-04-2026.docx)
+  - Alle Übungen gegliedert in Warm-up, Lockerung / Beweglichkeit, Kräftigung
   - Saubere Formatierung, direkt druckbereit
 
-  Die Datei öffnest du wie gewohnt in Microsoft Word oder LibreOffice.
+Schritt 6: Word-Datei vor dem Drucken bearbeiten (optional)
+  Die heruntergeladene Datei öffnest du in Microsoft Word oder LibreOffice.
+  Dort kannst du den Plan vor dem Ausdrucken noch anpassen:
+
+  - Einzelne Übungen streichen oder ergänzen
+  - Texte umformulieren oder kürzen
+  - Wiederholungen für bestimmte Übungen individuell ändern
+  - Logo oder Name der Praxis einfügen
+  - Bilder oder Zeichnungen zur Veranschaulichung hinzufügen
+  - Persönliche Notizen für den Patienten ergänzen
+
+  Danach speichern und ausdrucken oder per E-Mail an den Patienten schicken.
+
+  TIPP – Wo wird die Datei gespeichert?
+  ──────────────────────────────────────
+  Die App setzt automatisch den Dateinamen (Patient + Datum), aber der
+  Speicherordner wird vom Browser festgelegt – nicht von der App.
+
+  Standard: Die Datei landet im "Downloads"-Ordner deines Computers.
+
+  Wenn du bei jedem Export selbst wählen möchtest wo die Datei gespeichert
+  wird (empfohlen für bessere Ordnung), stelle das einmalig im Browser ein:
+
+  Chrome / Edge:
+    Einstellungen → Downloads →
+    "Vor dem Herunterladen fragen, wo die Datei gespeichert werden soll" → AN
+
+  Firefox:
+    Einstellungen → Allgemein → Downloads →
+    "Jedes Mal nachfragen, wo eine Datei gespeichert werden soll" → AN
+
+  Danach öffnet sich bei jedem Word-Export automatisch ein Speichern-Dialog.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
