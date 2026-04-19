@@ -411,6 +411,28 @@
         </div>
       </div>
 
+      <div class="form-group" style="margin-top:0.4rem">
+        <label for="lang_select">Sprache des Plans (für den Patienten)</label>
+        <select id="lang_select">
+          <option value="Deutsch">Deutsch</option>
+          <option value="Englisch">Englisch / English</option>
+          <option value="Türkisch">Türkisch / Türkçe</option>
+          <option value="Arabisch">Arabisch / العربية</option>
+          <option value="Russisch">Russisch / Русский</option>
+          <option value="Polnisch">Polnisch / Polski</option>
+          <option value="Französisch">Französisch / Français</option>
+          <option value="Spanisch">Spanisch / Español</option>
+          <option value="Italienisch">Italienisch / Italiano</option>
+          <option value="Kroatisch">Kroatisch / Hrvatski</option>
+          <option value="Serbisch">Serbisch / Srpski</option>
+          <option value="Rumänisch">Rumänisch / Română</option>
+          <option value="Portugiesisch">Portugiesisch / Português</option>
+          <option value="Griechisch">Griechisch / Ελληνικά</option>
+          <option value="Albanisch">Albanisch / Shqip</option>
+          <option value="Persisch">Persisch / فارسی</option>
+        </select>
+      </div>
+
       <button id="generateBtn" class="btn btn-primary" onclick="generatePlan()">
         Plan generieren
       </button>
@@ -493,7 +515,7 @@
     <label for="ex-cat">Kategorie *</label>
     <select id="ex-cat">
       <option value="Warm-up">Warm-up</option>
-      <option value="Lockerung">Lockerung</option>
+      <option value="Lockerung / Beweglichkeit">Lockerung / Beweglichkeit / Flexibility</option>
       <option value="Kräftigung">Kräftigung</option>
     </select>
 
@@ -556,6 +578,7 @@ async function generatePlan() {
   const exercises = sanitize(document.getElementById('exercise_input').value);
   const sets      = sanitize(document.getElementById('sets_input').value) || '3';
   const reps      = sanitize(document.getElementById('reps_input').value) || '15';
+  const language  = document.getElementById('lang_select').value;
 
   if (!patInfo || !goalInfo || !exercises) {
     showToast('Bitte alle drei Felder ausfüllen.', 'err');
@@ -575,6 +598,9 @@ async function generatePlan() {
   const prompt =
 `Du bist ein erfahrener Physiotherapeut und erstellst Hausaufgabenpläne für Patienten.
 
+SPRACHE:
+Schreibe den gesamten Plan (Übungsnamen, Beschreibungen, Abschnittstitel, alle Anweisungen) auf ${language === 'Deutsch' ? 'Deutsch' : `${language}. Der Plan ist für einen Patienten, der ${language} spricht. Übersetze alles vollständig – auch die Abschnittstitel (Warm-up, Lockerung / Beweglichkeit, Kräftigung)`}.`
+
 DATENBANK-LOGIK:
 Dir liegt eine Übungsdatenbank vor. Übungen können mehrere Namen haben (Deutsch/Englisch, Synonyme).
 Wenn der Therapeut einen Namen eingibt, prüfe ob er im Namen oder in der Beschreibung vorkommt oder semantisch identisch ist (z.B. "Plank" = "Unterarmstütz" = "Planke").
@@ -590,8 +616,8 @@ Gewünschte Übungen: ${exercises}
 Standard-Dosierung: ${sets} Sätze × ${reps} Wiederholungen (sofern nicht anders sinnvoll)
 
 STRENGE FORMATIERUNGS-REGELN – halte dich exakt daran:
-- Sortiere alle Übungen in genau drei Abschnitte: Warm-up, Lockerung, Kräftigung
-- Beginne jeden Abschnitt mit der Zeile: ## WARM-UP  oder  ## LOCKERUNG  oder  ## KRÄFTIGUNG
+- Sortiere alle Übungen in genau drei Abschnitte: Warm-up, Lockerung / Beweglichkeit, Kräftigung
+- Beginne jeden Abschnitt mit der Zeile: ## WARM-UP  oder  ## LOCKERUNG / BEWEGLICHKEIT  oder  ## KRÄFTIGUNG
 - Pro Übung: Zeile 1 = **Übungsname**, dann Beschreibung, dann Dosierung (Sätze × Wiederholungen/Dauer)
 - Nutze die angegebene Standard-Dosierung; passe sie nur an wenn medizinisch sinnvoll (z.B. Warm-up kürzer)
 - Nutze die Beschreibungen aus der Datenbank, passe sie ggf. auf den Patienten an
@@ -726,7 +752,7 @@ async function exportWord() {
 // ─────────────── Brain Table ───────────────
 function badgeClass(cat) {
   if (cat === 'Warm-up')    return 'badge-wu';
-  if (cat === 'Lockerung')  return 'badge-lo';
+  if (cat === 'Lockerung / Beweglichkeit') return 'badge-lo';
   if (cat === 'Kräftigung') return 'badge-kr';
   return 'badge-wu';
 }
