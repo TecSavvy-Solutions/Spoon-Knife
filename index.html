@@ -188,6 +188,7 @@
     }
     #output h3:first-child { margin-top: 0; }
     #output p  { margin-bottom: 0.4rem; }
+    #output p.bullet { padding-left: 0.8rem; }
     #output strong { color: var(--text); }
     .export-bar { display: flex; gap: 0.8rem; margin-top: 1rem; flex-wrap: wrap; }
 
@@ -672,7 +673,11 @@ STRENGE FORMATIERUNGS-REGELN – halte dich exakt daran:
 - Nutze die angegebene Standard-Dosierung; passe sie nur an wenn medizinisch sinnvoll (z.B. Warm-up kürzer)
 - Nutze die Beschreibungen aus der Datenbank, passe sie ggf. auf den Patienten an
 - Übungen ohne Datenbankeinträge mit * markieren
-- Füge am Ende einen Abschnitt ## ALLGEMEINE TIPPS mit 4–5 kurzen, praktischen Hinweisen für den Patienten hinzu (z.B. regelmäßig üben, bei Schmerzen stoppen, Therapeuten kontaktieren)
+- Füge am Ende einen Abschnitt ## ALLGEMEINE TIPPS & AUFBAU hinzu mit genau diesen 4 Punkten – übersetze sie vollständig in die Zielsprache, behalte aber das Format **Fett:** Text bei:
+  - **Aufbau:** Aktivierung → Kraft → funktionell
+  - **Schmerzgrenze:** Maximal 3–4/10. Es darf kein deutlicher Anstieg der Schmerzen am nächsten Tag auftreten (24h Verhalten).
+  - **Ausführung:** Achten Sie beim Ausführen der Übungen stets darauf, im schmerzfreien Bereich zu trainieren.
+  - **Tempo:** Führen Sie die Übungen langsam durch, um die Gelenkswahrnehmung wieder zu schulen und auf auftretende Schmerzen sofort reagieren zu können.
 - Schreibe professionell, klar und patientenfreundlich auf Deutsch`;
 
   try {
@@ -722,6 +727,11 @@ function renderOutput(text) {
     const trimmed = line.trim();
     if (/^##\s+/i.test(trimmed)) {
       html += `<h3>${esc(trimmed.replace(/^##\s+/, ''))}</h3>`;
+    } else if (/^[-*]\s+/.test(trimmed)) {
+      const bulletText = trimmed.replace(/^[-*]\s+/, '');
+      // Render inline bold (**label:** text) within bullet points
+      const formatted = esc(bulletText).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      html += `<p class="bullet">• ${formatted}</p>`;
     } else if (/^\*\*(.+?)\*\*/.test(trimmed)) {
       html += `<p><strong>${esc(trimmed.replace(/\*\*(.+?)\*\*/g, '$1'))}</strong></p>`;
     } else if (trimmed === '') {
@@ -784,8 +794,13 @@ async function exportWord() {
         spacing: { before: 160, after: 60 }
       }));
     } else if (/^[-*]\s+/.test(trimmed)) {
+      const bulletText = trimmed.replace(/^[-*]\s+/, '');
+      const boldMatch  = bulletText.match(/^\*\*(.+?)\*\*\s*(.*)/s);
       children.push(new Paragraph({
-        children: [new TextRun({ text: trimmed.replace(/^[-*]\s+/, ''), size: 20 })],
+        children: boldMatch
+          ? [new TextRun({ text: boldMatch[1], bold: true, size: 20 }),
+             new TextRun({ text: boldMatch[2] ? ' ' + boldMatch[2] : '', size: 20 })]
+          : [new TextRun({ text: bulletText, size: 20 })],
         bullet: { level: 0 },
         spacing: { after: 40 }
       }));
