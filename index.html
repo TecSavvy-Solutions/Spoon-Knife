@@ -630,7 +630,10 @@ STRENGE FORMATIERUNGS-REGELN – halte dich exakt daran:
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2 }
+          })
       }
     );
 
@@ -723,6 +726,12 @@ async function exportWord() {
       children.push(new Paragraph({
         children: [new TextRun({ text: name, bold: true, size: 22 })],
         spacing: { before: 160, after: 60 }
+      }));
+    } else if (/^[-*]\s+/.test(trimmed)) {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: trimmed.replace(/^[-*]\s+/, ''), size: 20 })],
+        bullet: { level: 0 },
+        spacing: { after: 40 }
       }));
     } else if (trimmed !== '') {
       children.push(new Paragraph({
@@ -940,6 +949,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('.modal').forEach(modal => {
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(modal.id); });
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape')
+      document.querySelectorAll('.modal.open').forEach(m => closeModal(m.id));
   });
 });
 </script>
