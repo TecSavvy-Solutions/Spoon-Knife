@@ -1,0 +1,327 @@
+// =============================================================================
+// SWING TRADING STRATEGIE: High Tight Flag | High Tight Pivot | Power Play
+// Nach: Mark Minervini, William O'Neil, Kristjan Qullamaggie
+// Pine Script v6 | TradingView
+// =============================================================================
+//@version=6
+strategy(
+     title          = "HTF/HTP/PowerPlay Swing Strategy [Minervini/O'Neil/Qullamaggie]",
+     overlay        = true,
+     default_qty_type  = strategy.fixed,
+     default_qty_value = 1,
+     pyramiding     = 0,
+     calc_on_every_tick = false,
+     commission_type    = strategy.commission.percent,
+     commission_value   = 0.1,
+     slippage       = 2
+ )
+
+// =============================================================================
+// ── INPUTS ────────────────────────────────────────────────────────────────────
+// =============================================================================
+
+// ── Risk Management ──────────────────────────────────────────────────────────
+var string G_RISK = "💰 Risiko & Positionsgrösse"
+i_accountSize  = input.float(10000.0, "Depot-Vermögen ($)",          group=G_RISK, minval=100,   step=100,  tooltip="Gesamtwert deines Depots in USD")
+i_riskPct      = input.float(1.0,     "Risiko pro Trade (%)",        group=G_RISK, minval=0.1,   maxval=10, step=0.1, tooltip="% des Depots, das du pro Trade riskierst")
+i_slPct        = input.float(7.0,     "Initial Stop Loss (%)",       group=G_RISK, minval=1.0,   maxval=25, step=0.5, tooltip="Prozentualer Abstand des harten Stop Loss vom Entry")
+i_trailPct     = input.float(5.0,     "Trailing Stop (%)",           group=G_RISK, minval=1.0,   maxval=20, step=0.5, tooltip="Trailing Stop nach Erreichen von TP1")
+i_tp1Mult      = input.float(2.0,     "TP1 CRV-Multiplikator",       group=G_RISK, minval=1.0,   maxval=10, step=0.1, tooltip="2.0 = 2:1 CRV (Chance:Risiko). TP1 = Entry + SL% × Multiplikator")
+
+// ── High Tight Flag ──────────────────────────────────────────────────────────
+var string G_HTF = "🚩 High Tight Flag (HTF)"
+i_htf_on         = input.bool(true,   "HTF Signale aktivieren",      group=G_HTF)
+i_htf_lookback   = input.int(40,      "Anstieg Lookback (Bars)",     group=G_HTF, minval=10, maxval=120, tooltip="Wie viele Bars für den Initialanstieg prüfen")
+i_htf_minRise    = input.float(80.0,  "Mindestanstieg (%)",          group=G_HTF, minval=30, maxval=300, step=5,   tooltip="Min. Kursanstieg in der Lookback-Periode (typisch ≥80-100%)")
+i_htf_consol     = input.int(15,      "Konsolidierungs-Bars (max)",  group=G_HTF, minval=3,  maxval=40,  tooltip="Max. Bars der Flaggen-Konsolidierung")
+i_htf_maxPull    = input.float(25.0,  "Max. Pullback vom Hoch (%)",  group=G_HTF, minval=5,  maxval=40,  step=1,   tooltip="Max. erlaubter Rücksetzer vom letzten Hoch")
+i_htf_tight      = input.float(15.0,  "Flag-Tightness Range (%)",    group=G_HTF, minval=3,  maxval=35,  step=1,   tooltip="Max. Handelsspanne in der Flag-Phase (High-Low der Konsolidierung)")
+i_htf_volMult    = input.float(1.3,   "Breakout Volumen-Multiplier", group=G_HTF, minval=1.0, maxval=5, step=0.1, tooltip="Volumen muss x-mal über dem 50-Bar-Durchschnitt liegen")
+
+// ── High Tight Pivot (VCP) ────────────────────────────────────────────────────
+var string G_HTP = "📍 High Tight Pivot / VCP (Minervini)"
+i_htp_on         = input.bool(true,   "HTP Signale aktivieren",      group=G_HTP)
+i_htp_lookback   = input.int(20,      "Pivot Lookback (Bars)",        group=G_HTP, minval=5,  maxval=60,  tooltip="Bars für die Pivot-Base Berechnung")
+i_htp_atrContr   = input.float(0.70,  "ATR Kontraktion (Faktor)",    group=G_HTP, minval=0.3, maxval=0.95, step=0.05, tooltip="ATR(5) muss < Faktor × ATR(20) sein (Volatilitätskompression)")
+i_htp_nearHigh   = input.float(0.95,  "Preis nahe am Hoch (Faktor)", group=G_HTP, minval=0.8, maxval=1.0, step=0.01, tooltip="Close muss >= Faktor × Pivot-Hoch sein")
+i_htp_volMult    = input.float(1.5,   "Breakout Volumen-Multiplier", group=G_HTP, minval=1.0, maxval=5, step=0.1)
+
+// ── Power Play (Qullamaggie) ──────────────────────────────────────────────────
+var string G_PP = "⚡ Power Play (Qullamaggie)"
+i_pp_on          = input.bool(true,   "PowerPlay Signale aktivieren",group=G_PP)
+i_pp_lookback    = input.int(252,     "52-Wochen-Hoch Lookback",     group=G_PP, minval=50, maxval=365, tooltip="Lookback für das 52-Wochen-Hoch (252 Handelstage)")
+i_pp_volMult     = input.float(2.0,   "Volumen-Multiplier",          group=G_PP, minval=1.0, maxval=10, step=0.1, tooltip="Volumen muss x-mal über dem 50-Bar-Schnitt liegen")
+i_pp_minGap      = input.float(0.0,   "Mindest Gap-Up (%)",          group=G_PP, minval=0,  maxval=20,  step=0.5, tooltip="0 = kein Gap erforderlich. >0 = Gap-Up Mindestgrösse")
+i_pp_bodyPct     = input.float(0.60,  "Körper-Anteil (min.)",        group=G_PP, minval=0.3, maxval=1.0, step=0.05, tooltip="Kerzenkörper muss min. x% der gesamten Range sein (starke Kerze)")
+
+// ── Darstellung ───────────────────────────────────────────────────────────────
+var string G_VIS = "🎨 Darstellung"
+i_showLabels     = input.bool(true,   "Signal-Labels anzeigen",      group=G_VIS)
+i_showLines      = input.bool(true,   "Entry/SL/TP Linien anzeigen", group=G_VIS)
+i_showTable      = input.bool(true,   "Info-Tabelle anzeigen",       group=G_VIS)
+i_showBg         = input.bool(true,   "Hintergrund-Highlights",      group=G_VIS)
+
+// =============================================================================
+// ── BERECHNUNGEN ─────────────────────────────────────────────────────────────
+// =============================================================================
+volAvg50 = ta.sma(volume, 50)
+atr5     = ta.atr(5)
+atr20    = ta.atr(20)
+
+// =============================================================================
+// ── HIGH TIGHT FLAG (HTF) ────────────────────────────────────────────────────
+// =============================================================================
+// 1) Starker Anstieg in der Lookback-Periode
+htf_periodHigh   = ta.highest(high,  i_htf_lookback)
+htf_periodLow    = ta.lowest(close,  i_htf_lookback)
+htf_rise         = (htf_periodHigh - htf_periodLow) / htf_periodLow * 100
+htf_bigRun       = htf_rise >= i_htf_minRise
+
+// 2) Konsolidierung (Flag) – enge Range in den letzten Konsolidierungs-Bars
+htf_flagHigh     = ta.highest(high, i_htf_consol)
+htf_flagLow      = ta.lowest(low,   i_htf_consol)
+htf_flagRange    = (htf_flagHigh - htf_flagLow) / htf_flagHigh * 100
+htf_isTight      = htf_flagRange <= i_htf_tight
+
+// 3) Begrenzter Pullback vom Periodenhoch
+htf_pullback     = (htf_periodHigh - close) / htf_periodHigh * 100
+htf_okPullback   = htf_pullback <= i_htf_maxPull
+
+// 4) Breakout über das Flag-Hoch mit Volumen
+htf_breakout     = close > ta.highest(high[1], i_htf_consol)
+htf_signal       = i_htf_on and htf_breakout and htf_bigRun and htf_isTight[1] and htf_okPullback and volume > volAvg50 * i_htf_volMult
+
+// =============================================================================
+// ── HIGH TIGHT PIVOT / VCP (Minervini) ───────────────────────────────────────
+// =============================================================================
+// VCP: Volatility Contraction Pattern – schmalere Bases, weniger Volumen, dann Ausbruch
+htp_pivotHigh    = ta.highest(high, i_htp_lookback)
+
+// Volatilitätskompression: ATR kontrahiert
+htp_atrOk        = atr5 < atr20 * i_htp_atrContr
+
+// Preis nahe am Pivot-Hoch (in der Aufbauphase)
+htp_nearHigh     = close >= htp_pivotHigh * i_htp_nearHigh
+
+// Breakout über das Pivot-Hoch mit erhöhtem Volumen
+htp_breakout     = close > htp_pivotHigh[1]
+htp_signal       = i_htp_on and htp_breakout and htp_atrOk[1] and htp_nearHigh[1] and volume > volAvg50 * i_htp_volMult
+
+// =============================================================================
+// ── POWER PLAY (Qullamaggie) ─────────────────────────────────────────────────
+// =============================================================================
+// Neues 52-Wochen-Hoch auf starkem Volumen, starke Kerze, ggf. Gap-Up
+pp_high52w       = ta.highest(high, i_pp_lookback)
+pp_new52wHigh    = high >= pp_high52w[1]
+
+// Gap-Up Check
+pp_gapUp         = i_pp_minGap <= 0.0 or (open > close[1] * (1 + i_pp_minGap / 100))
+
+// Starkes Volumen
+pp_bigVol        = volume > volAvg50 * i_pp_volMult
+
+// Starker Kerzenkörper (bullish, Close nahe am Hoch)
+pp_candleRange   = high - low
+pp_body          = math.abs(close - open)
+pp_strongBody    = pp_candleRange > 0 and (pp_body / pp_candleRange) >= i_pp_bodyPct
+pp_bullishClose  = close > open
+pp_strongClose   = close > (high + low) / 2
+
+pp_signal        = i_pp_on and pp_new52wHigh and pp_gapUp and pp_bigVol and pp_strongBody and pp_bullishClose and pp_strongClose
+
+// =============================================================================
+// ── KOMBINIERTES ENTRY-SIGNAL ─────────────────────────────────────────────────
+// =============================================================================
+entrySignal = (htf_signal or htp_signal or pp_signal) and strategy.position_size == 0
+
+// Signal-Typ Label-Text
+signalType =
+     htf_signal and htp_signal ? "HTF+HTP" :
+     htf_signal and pp_signal  ? "HTF+PP"  :
+     htp_signal and pp_signal  ? "HTP+PP"  :
+     htf_signal                ? "HTF"     :
+     htp_signal                ? "HTP"     :
+     pp_signal                 ? "PP"      : ""
+
+// =============================================================================
+// ── POSITIONSGRÖSSE ──────────────────────────────────────────────────────────
+// =============================================================================
+riskDollar     = i_accountSize * i_riskPct / 100
+stopDistPct    = i_slPct / 100
+stopDistDollar = close * stopDistPct
+numShares      = stopDistDollar > 0 ? math.floor(riskDollar / stopDistDollar) : 0
+posValue       = numShares * close
+
+// =============================================================================
+// ── STRATEGIE-VARIABLEN ───────────────────────────────────────────────────────
+// =============================================================================
+var float v_entry   = na
+var float v_sl      = na
+var float v_tp1     = na
+var float v_trail   = na
+var bool  v_tp1Hit  = false
+var int   v_qty     = 0
+var string v_type   = ""
+
+// =============================================================================
+// ── ENTRY ─────────────────────────────────────────────────────────────────────
+// =============================================================================
+if entrySignal and numShares > 0
+    v_entry  := close
+    v_sl     := close * (1 - i_slPct / 100)
+    v_tp1    := close * (1 + (i_slPct / 100) * i_tp1Mult)
+    v_trail  := high
+    v_tp1Hit := false
+    v_qty    := numShares
+    v_type   := signalType
+    strategy.entry("Long", strategy.long, qty=numShares, comment="ENTRY " + signalType)
+
+// =============================================================================
+// ── POSITION MANAGEMENT ──────────────────────────────────────────────────────
+// =============================================================================
+if strategy.position_size > 0
+    // Trailing High aktualisieren
+    v_trail := math.max(v_trail, high)
+
+    // TP1 erreicht → halbe Position verkaufen, SL → Einstiegspreis (Breakeven)
+    if not v_tp1Hit and high >= v_tp1
+        v_tp1Hit := true
+        v_sl     := v_entry  // Hard SL → Breakeven
+        halfQty  = math.floor(v_qty / 2)
+        strategy.exit("TP1", from_entry="Long", qty=halfQty, limit=v_tp1, comment="TP1 50%")
+
+    // Nach TP1: Trailing Stop auf restliche Position
+    if v_tp1Hit
+        trailLevel = v_trail * (1 - i_trailPct / 100)
+        // SL = Maximum aus Breakeven und Trailing Stop
+        v_sl := math.max(v_entry, trailLevel)
+        strategy.exit("Trail+SL", from_entry="Long", stop=v_sl, comment="Trail SL")
+    else
+        // Vor TP1: Harter Stop Loss
+        strategy.exit("InitSL", from_entry="Long", stop=v_sl, comment="Stop Loss")
+
+// Position geschlossen → Variablen zurücksetzen
+if strategy.position_size == 0 and strategy.position_size[1] > 0
+    v_entry  := na
+    v_sl     := na
+    v_tp1    := na
+    v_trail  := na
+    v_tp1Hit := false
+    v_qty    := 0
+    v_type   := ""
+
+// =============================================================================
+// ── VISUALS: SIGNAL LABELS ───────────────────────────────────────────────────
+// =============================================================================
+if i_showLabels and entrySignal and numShares > 0
+    _col = htf_signal and not (htp_signal or pp_signal) ? color.new(color.blue, 0) :
+           htp_signal and not (htf_signal or pp_signal) ? color.new(color.purple, 0) :
+           pp_signal  and not (htf_signal or htp_signal)? color.new(color.orange, 0) :
+           color.new(color.teal, 0)
+
+    _txt = "▲ " + signalType                             + "\n" +
+           "Entry:  $" + str.tostring(close, "#.##")    + "\n" +
+           "Stop:   $" + str.tostring(close*(1-i_slPct/100), "#.##") +
+           " (−" + str.tostring(i_slPct, "#.#") + "%)"  + "\n" +
+           "TP1:    $" + str.tostring(close*(1+(i_slPct/100)*i_tp1Mult), "#.##") +
+           " (" + str.tostring(i_tp1Mult, "#.#") + ":1)" + "\n" +
+           "Aktien: " + str.tostring(numShares)          + "\n" +
+           "Risiko: $" + str.tostring(riskDollar, "#.##")
+
+    label.new(bar_index, low * 0.995, _txt,
+         style     = label.style_label_up,
+         color     = _col,
+         textcolor = color.white,
+         size      = size.small)
+
+// =============================================================================
+// ── VISUALS: ENTRY / SL / TP LINIEN ─────────────────────────────────────────
+// =============================================================================
+inPos = strategy.position_size > 0
+
+// Entry-Linie (gelb)
+plot(i_showLines and inPos ? v_entry : na,
+     "Entry Price", color=color.new(color.yellow, 0), linewidth=1, style=plot.style_linebr)
+
+// Stop Loss Linie (rot, gestrichelt)
+plot(i_showLines and inPos ? v_sl : na,
+     "Stop Loss", color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
+
+// TP1 Linie (grün) – nur vor TP1-Hit
+plot(i_showLines and inPos and not v_tp1Hit ? v_tp1 : na,
+     "TP1 (2:1 CRV)", color=color.new(color.lime, 0), linewidth=2, style=plot.style_linebr)
+
+// Trailing-Referenz (nur nach TP1)
+plot(i_showLines and inPos and v_tp1Hit ? v_trail * (1 - i_trailPct / 100) : na,
+     "Trail Stop", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
+
+// =============================================================================
+// ── VISUALS: HINTERGRUND-HIGHLIGHTS ──────────────────────────────────────────
+// =============================================================================
+bgcolor(i_showBg and htf_signal ? color.new(color.blue,   87) : na, title="HTF Signal BG")
+bgcolor(i_showBg and htp_signal ? color.new(color.purple, 87) : na, title="HTP Signal BG")
+bgcolor(i_showBg and pp_signal  ? color.new(color.orange, 87) : na, title="PP Signal BG")
+
+// =============================================================================
+// ── INFO TABELLE ─────────────────────────────────────────────────────────────
+// =============================================================================
+if i_showTable
+    var table tbl = table.new(position.top_right, 2, 12,
+         bgcolor      = color.new(color.black, 65),
+         border_color = color.new(color.gray, 30),
+         border_width = 1,
+         frame_color  = color.new(color.gray, 0),
+         frame_width  = 1)
+
+    // Header
+    table.cell(tbl, 0, 0, "📊 SWING INFO",   text_color=color.white, bgcolor=color.new(color.navy,  20), text_halign=text.align_center)
+    table.cell(tbl, 1, 0, "",                text_color=color.white, bgcolor=color.new(color.navy,  20))
+    // Depot & Risiko
+    table.cell(tbl, 0, 1, "Depot",           text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 1, "$" + str.tostring(i_accountSize, "#,###.##"), text_color=color.lime, text_halign=text.align_right)
+    table.cell(tbl, 0, 2, "Risiko/Trade",    text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 2, str.tostring(i_riskPct,"#.##") + "% = $" + str.tostring(riskDollar, "#,###.##"), text_color=color.lime, text_halign=text.align_right)
+    // Stop & Trail
+    table.cell(tbl, 0, 3, "Init. Stop Loss", text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 3, str.tostring(i_slPct,"#.#") + "%", text_color=color.red, text_halign=text.align_right)
+    table.cell(tbl, 0, 4, "Trail Stop",      text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 4, str.tostring(i_trailPct,"#.#") + "%", text_color=color.orange, text_halign=text.align_right)
+    table.cell(tbl, 0, 5, "TP1 CRV",         text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 5, str.tostring(i_tp1Mult,"#.#") + ":1", text_color=color.lime, text_halign=text.align_right)
+    // Aktuelle Position
+    table.cell(tbl, 0, 6, "── Position ──",  text_color=color.gray, text_halign=text.align_left, bgcolor=color.new(color.gray, 80))
+    table.cell(tbl, 1, 6, "",                bgcolor=color.new(color.gray, 80))
+    table.cell(tbl, 0, 7, "Anzahl Aktien",   text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 7, str.tostring(numShares), text_color=color.yellow, text_halign=text.align_right)
+    table.cell(tbl, 0, 8, "Pos. Wert",       text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 8, "$" + str.tostring(posValue, "#,###.##"), text_color=color.yellow, text_halign=text.align_right)
+    table.cell(tbl, 0, 9, "Entry Price",     text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1, 9, inPos ? "$" + str.tostring(v_entry, "#.##") : "---", text_color=color.yellow, text_halign=text.align_right)
+    table.cell(tbl, 0,10, "Akt. Stop Loss",  text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1,10, inPos ? "$" + str.tostring(v_sl, "#.##") : "---", text_color=color.red, text_halign=text.align_right)
+    table.cell(tbl, 0,11, "Signal",          text_color=color.silver, text_halign=text.align_left)
+    table.cell(tbl, 1,11, inPos ? v_type : "Kein Signal", text_color=inPos ? color.lime : color.gray, text_halign=text.align_right)
+
+// =============================================================================
+// ── ALERTS ───────────────────────────────────────────────────────────────────
+// =============================================================================
+alertcondition(htf_signal, "HTF Entry Signal",
+     "🚩 HIGH TIGHT FLAG Entry! Ticker: {{ticker}} | Close: {{close}} | Aktien: " + str.tostring(numShares) + " | Stop: " + str.tostring(close*(1-i_slPct/100), "#.##"))
+
+alertcondition(htp_signal, "HTP Entry Signal",
+     "📍 HIGH TIGHT PIVOT Entry! Ticker: {{ticker}} | Close: {{close}} | Aktien: " + str.tostring(numShares) + " | Stop: " + str.tostring(close*(1-i_slPct/100), "#.##"))
+
+alertcondition(pp_signal, "PowerPlay Entry Signal",
+     "⚡ POWER PLAY Entry! Ticker: {{ticker}} | Close: {{close}} | Aktien: " + str.tostring(numShares) + " | Stop: " + str.tostring(close*(1-i_slPct/100), "#.##"))
+
+alertcondition(entrySignal, "Beliebiges Entry Signal",
+     "🎯 SWING ENTRY [" + signalType + "] Ticker: {{ticker}} | Close: {{close}}")
+
+alertcondition(inPos and not v_tp1Hit and low <= v_sl, "Stop Loss Hit",
+     "🛑 STOP LOSS ausgelöst! Ticker: {{ticker}} | SL: " + str.tostring(v_sl, "#.##"))
+
+alertcondition(inPos and not v_tp1Hit and high >= v_tp1, "TP1 erreicht",
+     "✅ TP1 ERREICHT! 50% verkauft. Ticker: {{ticker}} | TP1: " + str.tostring(v_tp1, "#.##") + " | SL → Breakeven")
+
+alertcondition(v_tp1Hit and inPos and low <= v_sl, "Trailing Stop Hit",
+     "⏹ TRAILING STOP ausgelöst! Ticker: {{ticker}} | Trail SL: " + str.tostring(v_sl, "#.##"))
