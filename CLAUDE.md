@@ -1,17 +1,32 @@
 # Claude Code – Arbeitsregeln
 
+## Sicherungs-Prinzip (gilt für ALLE Projekte)
+
+Alle Projektdaten – Code, Ordner, Skills, `.md`-Dateien, Konfigurationen usw. – werden **immer doppelt gesichert**:
+
+| Sicherungsort | Verfügbar | Wann |
+|---|---|---|
+| **Lokal** `C:\HOMESERVER` | Nur Desktop | Nach jeder Desktop-Session |
+| **GitHub** `TecSavvy-Solutions` | Desktop + Mobil | Nach jeder Session (commit + push) |
+
+> Mobil ist **ausschliesslich GitHub** als Sicherung möglich. Lokale Sicherung erfolgt nachträglich am Desktop.
+
+---
+
 ## Speicher-Workflow
 
 ### Mobil (Claude Code Web / App)
 - Jedes neue Projekt bekommt ein **eigenes Repository** in der GitHub-Organisation `TecSavvy-Solutions`
 - Namenskonvention: `kebab-case` (z.B. `swing-trading-strategy`, `portfolio-tracker`)
-- Neue Repos: `public: false` (privat) als Standard, sofern nicht anders gewünscht
+- Neue Repos: `private: true` als Standard, sofern nicht anders gewünscht
 - Nach Fertigstellung immer einen **Draft Pull Request** erstellen
 - **Temp-Container für neue mobile Projekte:** `TecSavvy-Solutions/claude-projects`
+- Alle erzeugten Dateien (Code, Skills, `.md`, Configs) werden committed und gepusht
 
 ### Desktop (lokale Entwicklung)
-- Arbeitsverzeichnis: `C:/homeserver`
-- Lokaler Speicher hat Vorrang; kein automatisches GitHub-Push ohne Aufforderung
+- Arbeitsverzeichnis: `C:\HOMESERVER`
+- Alle Dateien lokal speichern **und** auf GitHub pushen
+- Kein automatisches GitHub-Push ohne Aufforderung
 
 ### Session-Hinweis
 - Jede Claude Code Web-Session ist auf das beim Start gewählte Repository beschränkt
